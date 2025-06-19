@@ -2,22 +2,59 @@ pipeline {
     agent any
 
     environment {
-        TESTRIGOR_EMAIL = credentials('contactsohail07@gmail.com') // Jenkins credentials
-        TESTRIGOR_API_KEY = credentials('IJQ1IZe7R0w4TBEmFToCklIzEigpO8WatEmN6bq5qPW8htGYoz4p')
         TESTRIGOR_SUITE_ID = 'uXEinE6oADCuroch2'
+        TESTRIGOR_API_TOKEN = credentials('TESTRIGOR_API_TOKEN') // Store '274b9103-98d4-476a-864a-a611b6ba37bf' in Jenkins credentials
     }
 
     stages {
-        stage('Install TestRigor CLI') {
-            steps {
-                sh 'pip install testrigor'
-            }
-        }
-
         stage('Run TestRigor Tests') {
             steps {
                 sh '''
-                testrigor test --email $TESTRIGOR_EMAIL --api_key $TESTRIGOR_API_KEY --suite_id $TESTRIGOR_SUITE_ID
+                echo "Starting TestRigor test execution via API"
+
+                curl -X POST \
+                  -H 'Content-type: application/json' \
+                  -H "auth-token: $TESTRIGOR_API_TOKEN" \
+                  --data '{"forceCancelPreviousTesting":true,"storedValues":{"storedValueName1":"Value"}}' \
+                  https://api.testrigor.com/api/v1/apps/$TESTRIGOR_SUITE_ID/retest
+
+                sleep 10
+
+                while true
+                do
+                  echo " "
+                  echo "==================================="
+                  echo " Checking run status"
+                  echo "==================================="
+                  response=$(curl -i -o - -s -X GET "https://api.testrigor.com/api/v1/apps/$TESTRIGOR_SUITE_ID/status" -H "auth-token: $TESTRIGOR_API_TOKEN" -H "Accept: application/json")
+                  code=$(echo "$response" | grep HTTP |  awk '{print $2}')
+                  body=$(echo "$response" | sed -n '/{/,/}/p')
+                  echo "Status code: $code"
+                  echo "Response: $body"
+                  
+                  case $code in
+                    4*|5*)
+                      echo "❌ Error calling API"
+                      exit 1
+                      ;;
+                    200)
+                      echo "✅ Test finished successfully"
+                      exit 0
+                      ;;
+                    227|228)
+                      echo "⌛ Test is not finished yet"
+                      ;;
+                    230)
+                      echo "❌ Test finished but failed"
+                      exit 1
+                      ;;
+                    *)
+                      echo "❓ Unknown status"
+                      exit 1
+                      ;;
+                  esac
+                  sleep 10
+                done
                 '''
             }
         }
@@ -25,10 +62,13 @@ pipeline {
 
     post {
         always {
-            echo "Pipeline completed"
+            echo '✅ Pipeline completed.'
+        }
+        success {
+            echo '🎉 Tests passed successfully.'
         }
         failure {
-            echo "Tests failed. Please check the logs."
+            echo '🚨 Tests failed. Please review the logs.'
         }
     }
 }
