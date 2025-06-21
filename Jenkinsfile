@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
+                TESTRIGOR_EMAIL = credentials('contactsohail07@gmail.com') // Jenkins credentials
+        TESTRIGOR_API_KEY = credentials('IJQ1IZe7R0w4TBEmFToCklIzEigpO8WatEmN6bq5qPW8htGYoz4p')
         TESTRIGOR_SUITE_ID = 'uXEinE6oADCuroch2'
-        TESTRIGOR_API_TOKEN = credentials('TESTRIGOR_API_TOKEN') // Store '274b9103-98d4-476a-864a-a611b6ba37bf' in Jenkins credentials
     }
 
     stages {
